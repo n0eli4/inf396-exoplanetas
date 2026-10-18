@@ -1,0 +1,122 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-nodecimaldot]{babel}
+\usepackage[margin=2cm]{geometry}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+
+\titlespacing*{\section}{0pt}{8pt}{3pt}
+\setlist{nosep, leftmargin=*}
+\setlength{\parskip}{3pt}
+\setlength{\parindent}{0pt}
+
+\title{\vspace{-1.2cm}\textbf{Detección de exoplanetas en curvas de luz de Kepler:\\
+features físicas versus redes convolucionales 1D}\\[2pt]
+\large INF396 -- Propuesta de proyecto}
+\author{Noelia Morales \quad Matías Lara\\
+\small Ingeniería Civil Informática, Universidad Técnica Federico Santa María}
+\date{\vspace{-0.6cm}}
+
+\begin{document}
+\maketitle
+
+\section{Descripción del problema}
+
+Este trabajo trata sobre la \textbf{detección automática de estrellas con
+exoplanetas} a partir de sus \textbf{curvas de luz}, es decir, series de tiempo
+del flujo luminoso medido por el telescopio espacial Kepler. Cuando un planeta
+pasa frente a su estrella (\emph{tránsito}), bloquea una pequeña fracción de su
+luz y produce una caída breve y periódica del flujo. Detectar esa señal es
+difícil: la caída suele ser muy pequeña comparada con el ruido instrumental y
+con la variabilidad propia de la estrella, y las estrellas con planetas
+confirmados son extremadamente escasas.
+
+En la literatura, las redes convolucionales han mostrado ser efectivas para
+clasificar señales de tránsito en datos de Kepler~\cite{shallue2018,ansdell2018},
+y los clasificadores de \emph{gradient boosting} sobre features extraídas de la
+curva alcanzan resultados comparables con un costo computacional mucho
+menor~\cite{malik2022}. Sobre el mismo dataset que usaremos, Priyadarshini y
+Puri~\cite{priyadarshini2021} reportan un 99{,}62\% de \emph{accuracy} con un
+ensamble de CNN. Sin embargo, como solo el 0{,}9\% del conjunto de prueba es
+positivo, un clasificador que prediga ``sin planeta'' para todas las estrellas
+ya obtiene un 99{,}12\%. Esto muestra que la \emph{accuracy} no sirve para
+evaluar el problema y motiva un protocolo de evaluación más riguroso.
+
+\section{Objetivo del trabajo}
+
+\textbf{Nuestro objetivo es comparar un clasificador basado en features con
+significado físico contra una red neuronal convolucional 1D para detectar
+exoplanetas en curvas de luz de Kepler, con un protocolo de evaluación adecuado
+al fuerte desbalance de clases, y analizar mediante técnicas de
+interpretabilidad qué patrones aprende la red.} En concreto:
+\begin{enumerate}
+  \item \textbf{Baseline con features físicas:} además de estadísticos
+  descriptivos, extraer features del espectro de Fourier (FFT) y del
+  periodograma \emph{Box Least Squares} (BLS)~\cite{kovacs2002}: período,
+  profundidad, duración y potencia del tránsito más probable. Entrenar sobre
+  ellas Random Forest y XGBoost.
+  \item \textbf{Modelo secuencial:} entrenar una CNN 1D directamente sobre la
+  curva preprocesada (\emph{detrending} con filtro de mediana y normalización),
+  manejando el desbalance con ponderación de clases y \emph{data augmentation}
+  propia de series de tiempo (desplazamientos circulares, inversión temporal,
+  ruido gaussiano).
+  \item \textbf{Estudio de ablación:} medir el aporte de cada decisión de
+  diseño (preprocesamiento, ponderación de clases, \emph{augmentation}, tipo de
+  features) activándolas una a la vez.
+  \item \textbf{Interpretabilidad:} aplicar mapas de saliencia y Grad-CAM
+  1D~\cite{selvaraju2017} para verificar si la CNN basa sus predicciones en los
+  tránsitos o en artefactos, y analizar los falsos positivos y negativos.
+\end{enumerate}
+Como métricas usaremos \emph{recall}, precisión, F1 y el área bajo la curva
+precisión--\emph{recall} (PR-AUC). Dado que el conjunto de prueba original tiene
+solo 5 positivos, las estimaremos con validación cruzada estratificada repetida
+e intervalos de confianza por \emph{bootstrap}, además de reportarlas sobre el
+conjunto de prueba oficial.
+
+\section{Punto de partida}
+
+El proyecto no continúa un trabajo anterior. Existen implementaciones públicas
+relacionadas: el código de AstroNet~\cite{shallue2018}, que trabaja con curvas
+ya plegadas en fase del catálogo DR24 y no con este dataset, y numerosos
+notebooks en Kaggle que entrenan CNN o SVM sobre este mismo conjunto. Estos
+últimos suelen reportar \emph{accuracy} sobre un conjunto de prueba con 5
+positivos y aplican técnicas como SMOTE directamente sobre la serie cruda.
+Nuestro aporte está en:
+(i)~usar features físicas (BLS/FFT) en lugar de estadísticos genéricos;
+(ii)~un protocolo de evaluación robusto al desbalance;
+(iii)~un estudio de ablación sistemático; y
+(iv)~el análisis de interpretabilidad de la CNN.
+
+\section{Dataset}
+
+Usaremos \emph{Exoplanet Hunting in Deep Space -- Kepler labelled time series
+data}\footnote{\url{https://www.kaggle.com/datasets/keplersmachines/kepler-labelled-time-series-data}}
+(licencia CC0). Contiene curvas de luz ya limpiadas por NASA, con 3.197
+mediciones de flujo por estrella y una etiqueta binaria (planeta confirmado o
+no). Más del 99\% de los datos proviene de la Campaña~3; para aumentar los
+positivos, se añadieron estrellas con planetas confirmados de otras campañas.
+\begin{itemize}[label=\textbullet]
+  \item \texttt{exoTrain.csv}: 5.087 estrellas, de las cuales 37 tienen
+  exoplanetas (0{,}73\%).
+  \item \texttt{exoTest.csv}: 570 estrellas, de las cuales 5 tienen
+  exoplanetas (0{,}88\%).
+\end{itemize}
+El dataset no incluye marcas de tiempo. Para calcular el BLS supondremos una
+cadencia uniforme de aproximadamente 30 minutos (la cadencia larga de Kepler) y
+evaluaremos la sensibilidad de los resultados a ese supuesto.
+
+\section{Artículos relacionados}
+
+\begingroup
+\renewcommand{\section}[2]{}%
+\small
+\bibliographystyle{plain}
+\bibliography{refs}
+\endgroup
+
+\end{document}

@@ -1,0 +1,27 @@
+# Datasets pesados (se descargan desde Kaggle, ver data/README.md)
+data/*.csv
+
+# Entorno virtual y caches de Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Modelos entrenados y resultados pesados
+*.pt
+*.pth
+*.pkl
+results/*.npy
+
+# Archivos temporales de LaTeX (los .tex, .bib y el PDF final SI se suben)
+*.aux
+*.log
+*.out
+*.blg
+*.synctex.gz
+*.toc
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+.vscode/
