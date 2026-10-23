@@ -1,0 +1,40 @@
+\begin{thebibliography}{1}
+
+\bibitem{ansdell2018}
+Megan Ansdell, Yani Ioannou, Hugh~P. Osborn, Michele Sasdelli, et~al.
+\newblock Scientific domain knowledge improves exoplanet transit classification
+  with deep learning.
+\newblock {\em The Astrophysical Journal Letters}, 869(1):L7, 2018.
+
+\bibitem{kovacs2002}
+G{\'e}za Kov{\'a}cs, Shay Zucker, and Tsevi Mazeh.
+\newblock A box-fitting algorithm in the search for periodic transits.
+\newblock {\em Astronomy \& Astrophysics}, 391:369--377, 2002.
+
+\bibitem{malik2022}
+Abhishek Malik, Benjamin~P. Moster, and Christian Obermeier.
+\newblock Exoplanet detection using machine learning.
+\newblock {\em Monthly Notices of the Royal Astronomical Society},
+  513(4):5505--5516, 2022.
+
+\bibitem{priyadarshini2021}
+Ishaani Priyadarshini and Vikram Puri.
+\newblock A convolutional neural network ({CNN}) based ensemble model for
+  exoplanet detection.
+\newblock {\em Earth Science Informatics}, 14:735--747, 2021.
+
+\bibitem{selvaraju2017}
+Ramprasaath~R. Selvaraju, Michael Cogswell, Abhishek Das, Ramakrishna Vedantam,
+  Devi Parikh, and Dhruv Batra.
+\newblock Grad-{CAM}: Visual explanations from deep networks via gradient-based
+  localization.
+\newblock In {\em Proceedings of the IEEE International Conference on Computer
+  Vision (ICCV)}, pages 618--626, 2017.
+
+\bibitem{shallue2018}
+Christopher~J. Shallue and Andrew Vanderburg.
+\newblock Identifying exoplanets with deep learning: A five-planet resonant
+  chain around {Kepler-80} and an eighth planet around {Kepler-90}.
+\newblock {\em The Astronomical Journal}, 155(2):94, 2018.
+
+\end{thebibliography}
