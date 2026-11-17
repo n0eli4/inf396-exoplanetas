@@ -91,9 +91,11 @@ def bls_features(
     ])
 
 
-def all_features(Z: np.ndarray, cadence_min: float = CADENCE_MIN, n_jobs: int = -1) -> pd.DataFrame:
+def all_features(
+    Z: np.ndarray, cadence_min: float = CADENCE_MIN, periods: np.ndarray = PERIODS, n_jobs: int = -1
+) -> pd.DataFrame:
     """Concatena estadísticos, FFT y BLS en un solo DataFrame (una fila por estrella)."""
     return pd.concat(
-        [stat_features(Z), fft_features(Z, cadence_min), bls_features(Z, cadence_min, n_jobs=n_jobs)],
+        [stat_features(Z), fft_features(Z, cadence_min), bls_features(Z, cadence_min, periods, n_jobs=n_jobs)],
         axis=1,
     )

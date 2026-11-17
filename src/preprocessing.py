@@ -46,8 +46,14 @@ def normalize(X: np.ndarray) -> np.ndarray:
     return (X - med) / sigma
 
 
-def preprocess(X: np.ndarray, window: int = 101, n_sigma: float = 4.0) -> np.ndarray:
-    """Pipeline completo: detrending -> recorte de picos -> normalización."""
-    X = detrend_median(X, window)
-    X = clip_upward_outliers(X, n_sigma)
+def preprocess(X: np.ndarray, window: int | None = 101, n_sigma: float | None = 4.0) -> np.ndarray:
+    """Pipeline completo: detrending -> recorte de picos -> normalización.
+
+    window=None omite el detrending y n_sigma=None omite el recorte (para el estudio de ablación).
+    La normalización siempre se aplica: sin ella las escalas entre estrellas difieren en 6 órdenes de magnitud.
+    """
+    if window is not None:
+        X = detrend_median(X, window)
+    if n_sigma is not None:
+        X = clip_upward_outliers(X, n_sigma)
     return normalize(X)

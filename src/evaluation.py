@@ -100,6 +100,19 @@ def choose_threshold(y: np.ndarray, oof: np.ndarray) -> float:
     return float(thresholds[np.argmax(f1[:-1])])   # el último punto de la curva no tiene umbral
 
 
+def paired_diff(folds: pd.DataFrame, folds_ref: pd.DataFrame, metric: str = "pr_auc") -> pd.Series:
+    """Diferencia fold a fold (folds - folds_ref) entre dos configuraciones evaluadas con la misma partición.
+
+    Como ambas usan los mismos folds (mismo seed), la dificultad propia de cada fold se cancela y la
+    diferencia es mucho menos ruidosa que comparar medias. Solo usa los (repeat, fold) presentes en ambas,
+    así una CV 5x1 se puede comparar contra la primera repetición de una 5x5.
+    """
+    a = folds.set_index(["repeat", "fold"])[metric]
+    b = folds_ref.set_index(["repeat", "fold"])[metric]
+    common = a.index.intersection(b.index)
+    return a.loc[common] - b.loc[common]
+
+
 def summarize_cv(folds: pd.DataFrame) -> pd.DataFrame:
     """Media y desviación estándar de cada métrica a través de los folds."""
     return folds[list(METRICS)].agg(["mean", "std"]).T

@@ -1,0 +1,5 @@
+grupo,config,k,pr_auc,delta,mejora_en,recall@0.5,prec@0.5,umbral_cv,recall@umbral,prec@umbral
+Random Forest,base,25,0.394 ± 0.200,,,0.091,0.56,0.248,0.324,0.706
+Random Forest,sin peso de clase,25,0.352 ± 0.159,-0.042 ± 0.105,10/25,0.038,0.24,0.149,0.314,0.537
+XGBoost,base,25,0.377 ± 0.186,,,0.335,0.417,0.669,0.324,0.566
+XGBoost,sin peso de clase,25,0.406 ± 0.174,+0.029 ± 0.081,15/25,0.173,0.72,0.204,0.319,0.702
