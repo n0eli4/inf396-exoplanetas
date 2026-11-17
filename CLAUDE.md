@@ -133,6 +133,12 @@ README.
   `holm` en `src/evaluation.py`, y notebook `09_modelos_ramo` con conclusiones. Resultados en
   `results/09_modelos/`, `results/09_comparacion_modelos.csv`, `results/09_contrastes_ablacion.csv`
   y `results/09_modelos.png`.
+- Paso 14 (**M1 hecha, resultado negativo**): `src/folding.py` (vistas plegadas global de 201
+  valores y local de 61, centradas en el tránsito del mejor BLS, promediadas con la **media** por
+  intervalo porque la mediana borraba los tránsitos de período largo), `scripts/compute_folded.py`
+  (→ `results/folded_{train,test}.npz`, ~10 min en el laptop, ya versionados), `src/models_mlp.py`
+  (`FeedforwardClassifier`: MLP 262→64→32→1 con pérdida ponderada y opción `flip_views`) y
+  notebook `10_vista_plegada` con conclusiones.
 - `.venv` instalado en el laptop (torch 2.15 CPU, xgboost 3.2, scikit-learn 1.9.1).
 - El notebook 07 se genera con un script auxiliar fuera del repo. Para editarlo, modificar
   directamente el `.ipynb`.
@@ -142,6 +148,18 @@ README.
   de `results/07_ablacion/`, ejecutar el notebook 07 y completar las conclusiones de la CNN.
 
 # Hallazgos importantes
+
+- **Vista plegada (M1): no mejora; es un resultado negativo que hay que reportar** (CV 5×5,
+  `results/10_comparacion.csv`). RF sobre las vistas 0,21; red feedforward 0,11 (0,13 con
+  inversión); 18 features + vistas: RF 0,32 y red 0,22. Todas por debajo del RF con 18 features
+  (0,39), con diferencias significativas con Wilcoxon + Holm pero no con el t-test corregido + Holm.
+  Por qué: (1) el plegado depende del período del BLS, que es justo lo que falla en los planetas
+  perdidos; (2) el BLS centra todas las vistas en una caída, también en las estrellas sin planeta
+  (la vista promedio sin planeta tiene una caída central de la mitad de profundidad), así que lo que
+  distingue ya está en las 6 features BLS; (3) 262 entradas con 37 positivos llevan al sobreajuste.
+  Diferencia con Shallue y Vanderburg: ellos pliegan en el período de candidatos ya detectados
+  (DR24, miles de ejemplos). **Conclusión transversal: el cuello de botella es la búsqueda del
+  período.**
 
 - **Modelos del ramo (M3, CV 5×5, 18 features):** RF 0,394, KNN 0,378 y XGB 0,377 quedan empatados
   (Δ ≈ −0,02, p > 0,7). Logística L1 0,306, L2 0,287, LDA 0,196 y SVM RBF 0,140. La relación no es
@@ -277,8 +295,9 @@ ya decididos; (3) las comparaciones usan siempre la misma partición y diferenci
 
 # Pendiente (por prioridad), entrega el 2026-11-20
 
-1. **M1** (vista plegada + red feedforward), en curso en el laptop. M3 y M4 ya están hechas
-   (notebook 09).
+1. M1, M3 y M4 están hechas (notebooks 10 y 09). **M2** (features contra binarias eclipsantes y
+   segundo/tercer mejor período del BLS) es opcional: ataca justo el cuello de botella de la
+   búsqueda del período, pero solo si sobra tiempo. Prioridad ahora: el informe final.
 2. Terminar la ablación de la CNN (PC de la casa) y escribir sus conclusiones en el notebook 07.
    La parte clásica ya está lista.
 3. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa), hacer
