@@ -69,7 +69,7 @@ pip install -r requirements.txt
 | PC | CPU | CV de la CNN (5 folds × 20 épocas) | BLS por variante (train + test) |
 |---|---|---|---|
 | Casa | 12 hilos | ~7 min (411 s, medido) | ~6 min |
-| Laptop de Matías | Ryzen 5 4500U, 6 núcleos, 7 GB RAM | ~20–35 min (estimado) | ~10 min (medido: 536 s + 57 s) |
+| Laptop de Matías | Ryzen 5 4500U, 6 núcleos, 7 GB RAM | ~55 min (extrapolado: 4,7 s por época con 570 curvas; un entrenamiento completo, ~14 min) | ~10 min (medido: 536 s + 57 s) |
 
 Probar el código en el laptop con pocas épocas y dejar las corridas largas de la CNN para el PC
 de la casa.
@@ -101,6 +101,8 @@ de la casa.
 | `src/models_cnn.py` | `CNN1D` (3 bloques conv, global max pool) y `CNNClassifier` (`augment`, `noise_std`, `class_weight` ∈ {balanced, sqrt, none}, `cosine_lr`) |
 | `scripts/compute_features.py` | `--variante base\|sin_detrend\|sin_recorte\|ventana_301\|cadencia_15\|cadencia_60\|periodos_15\|todas`. Escribe `results/features_<variante>_{train,test}.csv` |
 | `scripts/run_ablation.py` | `--grupo clasicos\|cnn\|todos`, `--solo <nombres>`. Guarda `results/07_ablacion/<nombre>.csv` y `<nombre>_oof.npy`; se salta lo que ya existe |
+| `src/interpretability.py` | `saliency`, `grad_cam` (ReLU del último bloque conv), `smooth`, `bls_transit_mask` (puntos dentro de los tránsitos del mejor BLS) y `attention_on_transits` (concentración del Grad-CAM en esos tránsitos; ×1 = sin preferencia) |
+| `notebooks/08_interpretabilidad.ipynb` | Grad-CAM contra tránsitos BLS en el test, importancia por permutación del RF, análisis de errores con las predicciones fuera de fold y prueba de sesgo por campaña. `CNN_NOMBRE`/`CNN_PARAMS` al inicio: cambiarlos a la mejor CNN de la ablación. La CNN entrenada se guarda en `results/08_<nombre>.pt` (ignorado por git) |
 | `notebooks/07_ablacion.ipynb` | Lee `results/07_ablacion/` y genera `results/07_ablacion_resumen.csv` y `results/07_ablacion.png` |
 
 # Estado (actualizado 2026-11-17)
@@ -117,6 +119,9 @@ README.
 - Paso 11: las 6 variantes de features calculadas y versionadas
   (`results/features_<variante>_*.csv`, no hace falta recalcularlas). **Ablación clásica
   completa:** 16 configuraciones, con conclusiones escritas en el notebook 07.
+- Paso 12: `src/interpretability.py` y notebook 08 (Grad-CAM, importancia por permutación,
+  análisis de errores y **fuga de información del dataset**), ejecutado con la CNN base y con
+  conclusiones escritas. Figuras: `results/08_gradcam.png` y `results/08_importancia_rf.png`.
 - `.venv` instalado en el laptop (torch 2.15 CPU, xgboost 3.2, scikit-learn 1.9.1).
 - El notebook 07 se genera con un script auxiliar fuera del repo. Para editarlo, modificar
   directamente el `.ipynb`.
@@ -126,6 +131,29 @@ README.
   de `results/07_ablacion/`, ejecutar el notebook 07 y completar las conclusiones de la CNN.
 
 # Hallazgos importantes
+
+- **⚠ El dataset tiene una fuga de información (hallazgo central para el informe, notebook 08,
+  sección 4):** las 5.615 estrellas sin planeta (train y test) tienen la mediana del flujo crudo
+  **exactamente en 0**, pero 31 de 37 y 3 de 5 estrellas con planeta no. La regla "mediana ≠ 0 ⇒
+  planeta" logra recall 0,84 y precisión 1,0 en el entrenamiento, y 0,60 / 1,0 en el test, mejor que
+  cualquiera de nuestros modelos. Por eso las cifras publicadas sobre este dataset (por ejemplo, el
+  99,62 % de Priyadarshini y Puri) no son comparables. **Nuestro pipeline es inmune:** el
+  preprocesamiento centra todas las curvas, y un RF con solo el "lado de arriba" de la curva
+  preprocesada da PR-AUC 0,018 en CV y 0,012 en el test (azar: 0,007). Ruido, tendencia y valores
+  repetidos difieren un poco entre clases, pero no separan (AP ≈ 0,01).
+- **Interpretabilidad de la CNN base:** el Grad-CAM no se concentra en los tránsitos del BLS
+  (×1,0 en planetas, igual que en estrellas sin planeta). En los planetas de señal débil mira los
+  tramos ruidosos del final; en los de tránsitos profundos marca algunas caídas. Falsos positivos:
+  test 241 (tres caídas aisladas: la red detecta caídas, no su repetición, como se planteó en el
+  informe de avance), test 372 (probable binaria eclipsante) y test 486 (oscilación). La lectura es
+  cualitativa (resolución de ~16 puntos, 5 planetas).
+- **Errores del RF (fuera de fold):** detecta 13 de 37 planetas con el umbral de la CV. Los no
+  detectados tienen un período BLS de ~22 d, ~2 tránsitos y contraste 1,6, prácticamente lo mismo que
+  una estrella sin planeta típica: el BLS no engancha la repetición. **El cuello de botella es la
+  extracción de features, no el clasificador** (coherente con la sensibilidad a la cadencia). Los
+  falsos positivos tienen muchas caídas periódicas (~21) y SNR alto, típico de binarias eclipsantes.
+- **Importancia por permutación del RF:** `fft_peak_freq`, `bls_period`, `bls_power_ratio` y
+  `bls_n_transits` son las más importantes, con mucha varianza entre folds.
 
 - **Baseline (CV 5×5, PR-AUC):** Random Forest 0,394 ± 0,200 (reproducido exacto);
   XGBoost 0,377 ± 0,186 (0,374 en el informe de avance; la pequeña diferencia viene
@@ -157,8 +185,8 @@ README.
 - **Rarezas de los datos:** etiquetas originales 2 = planeta y 1 = no (`data.py` las pasa a
   1/0); sin marcas de tiempo (de ahí el supuesto de cadencia); 4 estrellas con MAD = 0 tras
   el detrending (se usa la desviación estándar); más del 99 % de los datos es de la campaña 3
-  y los positivos extra vienen de otras campañas, lo que podría introducir sesgo (sin
-  verificar).
+  y los positivos extra vienen de otras campañas. Eso produce la fuga de la mediana descrita
+  arriba (verificada).
 - **Estrella 28 (con planeta):** el BLS se apoya en una sola caída profunda. Sirve como
   ejemplo para la interpretabilidad.
 
@@ -168,10 +196,10 @@ README.
    La parte clásica ya está lista.
 2. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa) y
    evaluarla en el test con el umbral elegido en CV.
-3. **Interpretabilidad** (notebook 08, prometido en el informe de avance): saliencia y
-   Grad-CAM 1D sobre los positivos del test y los falsos positivos con mayor puntaje;
-   comprobar si la CNN mira las mismas caídas que el BLS; importancia por permutación en el
-   RF; análisis de falsos positivos y negativos; revisar el sesgo por campaña.
+3. Interpretabilidad (notebook 08): **hecha con la CNN base.** Cuando esté la ablación de la
+   CNN, cambiar `CNN_NOMBRE`/`CNN_PARAMS` a la mejor configuración, volver a ejecutar el
+   notebook y revisar si cambian las conclusiones (el análisis de errores ya usará los OOF de
+   la CNN). Ese cambio requiere reentrenar la CNN: ~14 min en el laptop o ~4 en el PC de la casa.
 4. Ajuste de hiperparámetros: grilla chica para RF/XGB con validación anidada liviana. Si no
    alcanza el tiempo, justificarlo en el informe.
 5. Informe final en `report/final/`, partiendo de `parcial_v1.tex` y agregando las secciones
