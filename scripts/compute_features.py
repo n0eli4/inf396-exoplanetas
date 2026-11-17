@@ -50,7 +50,9 @@ def compute(variante: str) -> None:
         feats["label"] = y
         sufijo = "" if variante == "base" else f"{variante}_"
         out = ROOT / "results" / f"features_{sufijo}{name}.csv"
-        feats.to_csv(out, index=False)
+        tmp = out.with_suffix(".tmp")
+        feats.to_csv(tmp, index=False)
+        tmp.replace(out)   # el CSV aparece completo de una vez: run_ablation.py nunca lee uno a medio escribir
         print(f"[{variante}] {name}: {feats.shape} -> {out.name} ({time.time() - t0:.0f} s)", flush=True)
 
 

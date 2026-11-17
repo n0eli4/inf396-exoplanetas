@@ -114,14 +114,16 @@ README.
 - Paso 9: augmentation en la CNN (desplazamiento circular, inversión temporal, ruido
   gaussiano), opciones de peso de clase y tasa coseno; `choose_threshold`.
 - Paso 10: `run_ablation.py`, variantes en `compute_features.py`, `paired_diff`, notebook 07.
-  Ablación clásica de la ponderación de clases ya corrida.
+- Paso 11: las 6 variantes de features calculadas y versionadas
+  (`results/features_<variante>_*.csv`, no hace falta recalcularlas). **Ablación clásica
+  completa:** 16 configuraciones, con conclusiones escritas en el notebook 07.
 - `.venv` instalado en el laptop (torch 2.15 CPU, xgboost 3.2, scikit-learn 1.9.1).
+- El notebook 07 se genera con un script auxiliar fuera del repo. Para editarlo, modificar
+  directamente el `.ipynb`.
 
 **En curso:**
-- Laptop: `compute_features.py --variante todas` (6 variantes, ~1 h). Al terminar:
-  `run_ablation.py --grupo clasicos`, ejecutar el notebook 07, commit y push.
-- PC de la casa: `run_ablation.py --grupo cnn` (8 configuraciones, ~1 h), después commit y
-  push de `results/07_ablacion/`.
+- PC de la casa: `run_ablation.py --grupo cnn` (8 configuraciones, ~1 h). Después, commit y push
+  de `results/07_ablacion/`, ejecutar el notebook 07 y completar las conclusiones de la CNN.
 
 # Hallazgos importantes
 
@@ -134,9 +136,21 @@ README.
   En el test encuentra los 5 planetas entre las posiciones 3 y 7 de 570.
 - **Test oficial:** intervalos bootstrap enormes (por ejemplo, PR-AUC del RF de 0,58 con
   IC [0,16; 1,0]). No hay evidencia de que un modelo sea mejor que otro.
-- **Ponderación de clases en los clásicos (diferencia pareada en 25 folds):** RF sin peso
-  −0,042 ± 0,105 (mejora en 10/25 folds); XGB sin peso +0,029 ± 0,081 (15/25). Efecto
-  pequeño frente al ruido; la ponderación no es decisiva en los modelos de árboles.
+- **Ablación clásica (diferencia pareada contra la base, 25 folds; detalle en
+  `results/07_ablacion_resumen.csv` y `results/07_ablacion.png`):**
+  - **Lo que más pesa es el preprocesamiento.** Sin detrending, el PR-AUC cae a ~0,17 (Δ −0,21 a
+    −0,23; mejora solo en 3/25 folds). Con ventana 301 cae a 0,21–0,24 (Δ −0,14 a −0,19). Sin
+    recorte de picos, Δ −0,05 a −0,09 (en el RF mejora solo en 2/25 folds).
+  - **La ponderación de clases casi no importa en los árboles:** RF sin peso −0,042 (mejora en
+    10/25 folds); XGB sin peso +0,029 (15/25). Ambas diferencias están dentro del ruido.
+  - **Sensibilidad a la cadencia:** el PR-AUC va de 0,32 (15 min) a 0,43 (60 min); con
+    períodos de 0,5–15 d (y cadencia de 30 min) da 0,41–0,43. La explicación es que la grilla
+    está en días: con 15 min, el período máximo cubre casi toda la curva (~2.880 puntos) y el
+    BLS ajusta caídas aisladas; limitar el período máximo a ~720 puntos (al menos ~4
+    repeticiones) ayuda un poco (+0,02 a +0,05, en 16–18/25 folds). **Exigir que el tránsito se
+    repita ayuda** (relacionado con la estrella 28). Estas mejoras se eligieron mirando la misma
+    CV, así que **no se cambió la configuración principal**; se reportan como sensibilidad. Si se
+    adoptaran, habría que decirlo en el informe.
 - **Umbral 0,5 vs umbral elegido en CV:** el RF con 0,5 tiene recall 0,09; con el umbral de la
   CV (~0,25) sube a ~0,32 con precisión ~0,7. Hay que reportar las métricas con el umbral
   elegido en CV, no con 0,5.
@@ -150,8 +164,8 @@ README.
 
 # Pendiente (por prioridad), entrega el 2026-11-20
 
-1. Terminar la ablación (variantes de features y CNN) y escribir las conclusiones en el
-   notebook 07.
+1. Terminar la ablación de la CNN (PC de la casa) y escribir sus conclusiones en el notebook 07.
+   La parte clásica ya está lista.
 2. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa) y
    evaluarla en el test con el umbral elegido en CV.
 3. **Interpretabilidad** (notebook 08, prometido en el informe de avance): saliencia y
