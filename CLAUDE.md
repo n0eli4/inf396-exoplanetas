@@ -122,6 +122,12 @@ README.
 - Paso 12: `src/interpretability.py` y notebook 08 (Grad-CAM, importancia por permutación,
   análisis de errores y **fuga de información del dataset**), ejecutado con la CNN base y con
   conclusiones escritas. Figuras: `results/08_gradcam.png` y `results/08_importancia_rf.png`.
+- Paso 13 (**M3 y M4 hechas**): modelos del ramo en `src/models_classic.py` (`MODELOS_RAMO`:
+  logística L1/L2 con C elegido por CV interna, LDA con encogimiento, KNN k=15, SVM RBF; escalado
+  estándar dentro del pipeline), `paired_tests` (t-test corregido de Nadeau y Bengio + Wilcoxon) y
+  `holm` en `src/evaluation.py`, y notebook `09_modelos_ramo` con conclusiones. Resultados en
+  `results/09_modelos/`, `results/09_comparacion_modelos.csv`, `results/09_contrastes_ablacion.csv`
+  y `results/09_modelos.png`.
 - `.venv` instalado en el laptop (torch 2.15 CPU, xgboost 3.2, scikit-learn 1.9.1).
 - El notebook 07 se genera con un script auxiliar fuera del repo. Para editarlo, modificar
   directamente el `.ipynb`.
@@ -131,6 +137,25 @@ README.
   de `results/07_ablacion/`, ejecutar el notebook 07 y completar las conclusiones de la CNN.
 
 # Hallazgos importantes
+
+- **Modelos del ramo (M3, CV 5×5, 18 features):** RF 0,394, KNN 0,378 y XGB 0,377 quedan empatados
+  (Δ ≈ −0,02, p > 0,7). Logística L1 0,306, L2 0,287, LDA 0,196 y SVM RBF 0,140. La relación no es
+  lineal (interacciones como "período corto **y** muchos tránsitos"). Que un KNN simple empate
+  con el RF indica que **lo valioso son las features físicas, no el clasificador**. El lasso
+  conserva 15 de 18 features; las de mayor peso combinan FFT y BLS.
+- **Lección de preprocesamiento (reportar en el informe):** la transformación por cuantiles a
+  distribución normal hundió la logística de 0,29 a 0,10, porque aplasta las colas, y con eventos
+  raros la señal está en los valores extremos. Se cambió a la estandarización común. La variante
+  descartada quedó registrada como `logistica_l2_cuantiles`.
+- **Contraste de hipótesis (M4):** con el t-test corregido de Nadeau y Bengio y Holm (14
+  comparaciones), **ninguna diferencia de la ablación es significativa**, ni siquiera quitar el
+  detrending (Δ −0,23, p = 0,04 sin ajustar y 0,52 con Holm). Con Wilcoxon (optimista, ignora la
+  dependencia entre folds) y Holm sí lo son: quitar el detrending y la ventana 301 en ambos
+  modelos, y quitar el recorte solo en el RF. La ponderación de clases, la cadencia, los períodos y
+  las diferencias RF/XGB/KNN no son significativos con ninguna prueba. **Mensaje:** los efectos
+  grandes tienen una dirección muy consistente, pero con 37 positivos el experimento no tiene
+  potencia para confirmarlos con una prueba conservadora. Los efectos chicos no deben presentarse
+  como mejoras.
 
 - **⚠ El dataset tiene una fuga de información (hallazgo central para el informe, notebook 08,
   sección 4):** las 5.615 estrellas sin planeta (train y test) tienen la mediana del flujo crudo
@@ -247,7 +272,8 @@ ya decididos; (3) las comparaciones usan siempre la misma partición y diferenci
 
 # Pendiente (por prioridad), entrega el 2026-11-20
 
-1. **M3 y M4** (en curso en el laptop), después **M1**. Ver el plan de mejoras.
+1. **M1** (vista plegada + red feedforward), en curso en el laptop. M3 y M4 ya están hechas
+   (notebook 09).
 2. Terminar la ablación de la CNN (PC de la casa) y escribir sus conclusiones en el notebook 07.
    La parte clásica ya está lista.
 3. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa), hacer

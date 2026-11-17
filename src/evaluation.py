@@ -3,6 +3,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 from sklearn.metrics import average_precision_score, f1_score, precision_recall_curve, precision_score, recall_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 
@@ -111,6 +112,39 @@ def paired_diff(folds: pd.DataFrame, folds_ref: pd.DataFrame, metric: str = "pr_
     b = folds_ref.set_index(["repeat", "fold"])[metric]
     common = a.index.intersection(b.index)
     return a.loc[common] - b.loc[common]
+
+
+def paired_tests(diff: pd.Series, n_splits: int = 5) -> dict:
+    """Contrastes de hipótesis sobre diferencias pareadas por fold (salida de paired_diff). H0: diferencia media = 0.
+
+    - t-test corregido para CV repetida (Nadeau y Bengio, 2003): los folds comparten datos de entrenamiento,
+      así que sus diferencias no son independientes y el t-test común subestima la varianza (da p-valores
+      demasiado chicos). La corrección multiplica la varianza por (1/n + n_val/n_entr) en vez de 1/n, con
+      n_val/n_entr = 1/(n_splits - 1).
+    - Wilcoxon de rangos con signo: no supone normalidad, pero tampoco corrige la dependencia entre folds
+      (es optimista); se reporta como complemento.
+    Ambos son bilaterales.
+    """
+    d = np.asarray(diff, dtype=float)
+    n = len(d)
+    var = d.var(ddof=1)
+    t = d.mean() / np.sqrt((1 / n + 1 / (n_splits - 1)) * var) if var > 0 else np.nan
+    p_t = 2 * stats.t.sf(abs(t), df=n - 1) if var > 0 else np.nan
+    p_w = stats.wilcoxon(d).pvalue if np.any(d != 0) else np.nan
+    return {"delta": d.mean(), "t_corregido": t, "p_t_corregido": p_t, "p_wilcoxon": p_w, "n_folds": n}
+
+
+def holm(pvalues) -> np.ndarray:
+    """Corrección de Holm-Bonferroni para comparaciones múltiples (controla la probabilidad de algún falso hallazgo)."""
+    p = np.asarray(pvalues, dtype=float)
+    orden = np.argsort(p)
+    ajust = np.empty_like(p)
+    m = len(p)
+    acumulado = 0.0
+    for rango, i in enumerate(orden):
+        acumulado = max(acumulado, min(1.0, (m - rango) * p[i]))
+        ajust[i] = acumulado
+    return ajust
 
 
 def summarize_cv(folds: pd.DataFrame) -> pd.DataFrame:
