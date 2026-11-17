@@ -190,23 +190,79 @@ README.
 - **Estrella 28 (con planeta):** el BLS se apoya en una sola caída profunda. Sirve como
   ejemplo para la interpretabilidad.
 
+# Cómo leer y presentar los resultados (acordado con el usuario el 2026-11-17)
+
+- Los números son **modestos en términos absolutos, pero sólidos**: PR-AUC de ~0,39–0,43 frente a
+  0,007 del azar (unas 55 veces mejor) y 0,07 de una regresión logística simple. En el test, la CNN
+  base pone los 5 planetas entre los puestos 3 y 7 de 570 estrellas. El RF, con su umbral, detecta 1
+  de cada 3 planetas, con ~70 % de precisión.
+- **Debilidad que hay que reconocer:** se escapan unos 2 de cada 3 planetas, sobre todo los de período
+  largo o señal débil, en los que el BLS no engancha la repetición.
+- **Mensaje para el informe y la presentación:** "con una evaluación honesta, el problema es mucho más
+  difícil de lo que sugiere la literatura. El mejor modelo es ~55 veces mejor que el azar, los errores
+  se explican por la extracción de features y no por el clasificador, y el 99 % publicado no es
+  comparable (accuracy inútil con este desbalance, más la fuga de la mediana)". La rúbrica evalúa la
+  solución, la implementación y el análisis, no superar un número.
+
+# Plan de mejoras con herramientas del ramo (acordado el 2026-11-17)
+
+El ramo es **INF396 Introducción a la Ciencia de Datos** (https://aavelozb.github.io/inf396/):
+preprocesamiento y extracción de características, inferencia (bootstrap, contraste de hipótesis,
+bayesiana), CV y regularización (ridge, lasso), regresión logística, LDA, KNN, SVM, redes feedforward,
+procesos gaussianos, aprendizaje no supervisado y ML causal. Las mejoras deben usar estas herramientas
+y justificarse con ellas en el informe.
+
+**Orden acordado: primero M3 y M4 (rápidas y seguras), después M1. M2 solo si sobra tiempo. M5
+cuando estén los resultados de la CNN.**
+
+- **M1. Vista plegada + red feedforward (unidad 8) — la de mayor potencial.** Plegar la curva
+  preprocesada en el período del BLS (fase de −0,5 a 0,5, centrada en el tránsito) y promediarla en
+  ~200 bins: todas las repeticiones del tránsito quedan apiladas. Usarla como entrada de un MLP
+  (o una CNN chica) con el mismo protocolo de CV 5×5. Es la idea de "vista global/local" de
+  Shallue y Vanderburg (2018), ya citado. Ataca las dos debilidades encontradas: la CNN no ve la
+  repetición, y la repetición es justo lo que la vista plegada hace explícito. Tiempo: ~2–3 h más
+  ~10 min de BLS.
+- **M2. Features para descartar binarias eclipsantes (extracción de características).** Comparar
+  la profundidad de los tránsitos pares contra los impares (en una binaria difieren), buscar un
+  eclipse secundario a fase 0,5, medir la variación de profundidad entre tránsitos individuales y
+  sacar el segundo y tercer mejor período del BLS. Ataca los falsos positivos (por ejemplo, el
+  test 372) y los casos con un período espurio. Tiempo: ~2 h más ~10 min de BLS.
+- **M3. Modelos del ramo sobre las 18 features (clasificación).** Regresión logística con L1
+  (lasso, que además selecciona features) y L2, LDA, KNN y SVM, con escalado dentro del pipeline
+  para que no haya fuga entre folds. Mismo protocolo (CV 5×5, seed 0). Sirve como "comparación con
+  otros métodos". Tiempo: ~30 min.
+- **M4. Contraste de hipótesis para comparar modelos (inferencia).** Sobre las diferencias
+  pareadas por fold: prueba de Wilcoxon de rangos con signo y t-test corregido para CV repetida
+  (Nadeau y Bengio, 2003), que corrige la dependencia entre folds que comparten datos de
+  entrenamiento. Reemplaza el "está dentro del ruido" dicho a ojo por un p-valor. Tiempo: ~30 min.
+- **M5. Ensamble CNN + RF.** Promediar los rankings: cometen errores distintos (la CNN tiene más
+  recall; el RF, más precisión). Tiempo: ~20 min con los OOF de la CNN.
+- **Trabajo futuro (solo mencionar en el informe):** procesos gaussianos para modelar la
+  variabilidad estelar antes de buscar tránsitos (se usan en astronomía, unidad 5).
+
+**Precaución contra el sobreajuste a la CV (obligatoria):** con 37 positivos, probar muchas
+variantes y quedarse con la mejor infla los resultados. Por eso: (1) el informe reporta **todo lo
+probado**, no solo lo que funcionó; (2) el **test se toca una sola vez al final**, con los modelos
+ya decididos; (3) las comparaciones usan siempre la misma partición y diferencias pareadas.
+
 # Pendiente (por prioridad), entrega el 2026-11-20
 
-1. Terminar la ablación de la CNN (PC de la casa) y escribir sus conclusiones en el notebook 07.
+1. **M3 y M4** (en curso en el laptop), después **M1**. Ver el plan de mejoras.
+2. Terminar la ablación de la CNN (PC de la casa) y escribir sus conclusiones en el notebook 07.
    La parte clásica ya está lista.
-2. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa) y
-   evaluarla en el test con el umbral elegido en CV.
-3. Interpretabilidad (notebook 08): **hecha con la CNN base.** Cuando esté la ablación de la
+3. Elegir la mejor configuración de la CNN, correrla en CV 5×5 (~35 min en el PC de la casa), hacer
+   M5 y evaluar en el test, una sola vez, todos los modelos finales con el umbral elegido en CV.
+4. Interpretabilidad (notebook 08): **hecha con la CNN base.** Cuando esté la ablación de la
    CNN, cambiar `CNN_NOMBRE`/`CNN_PARAMS` a la mejor configuración, volver a ejecutar el
    notebook y revisar si cambian las conclusiones (el análisis de errores ya usará los OOF de
    la CNN). Ese cambio requiere reentrenar la CNN: ~14 min en el laptop o ~4 en el PC de la casa.
-4. Ajuste de hiperparámetros: grilla chica para RF/XGB con validación anidada liviana. Si no
-   alcanza el tiempo, justificarlo en el informe.
 5. Informe final en `report/final/`, partiendo de `parcial_v1.tex` y agregando las secciones
-   que exige el curso. Subir el PDF.
-6. README: actualizar la tabla de notebooks (07 y 08), los resultados y el estado.
-7. Presentación de 10–15 min (lista el jueves 19).
+   que exige el curso. Se puede empezar ya, dejando marcados los números de la CNN final. Subir el PDF.
+6. README: actualizar la tabla de notebooks (07, 08 y los nuevos), los resultados y el estado.
+7. Presentación de 10–15 min (lista el jueves 19). Incluir una diapositiva sobre la fuga de
+   información.
+8. Ajuste de hiperparámetros de RF/XGB con validación anidada liviana: prioridad baja. Si no se
+   hace, justificarlo en el informe (pocos positivos, riesgo de sobreajuste a la CV).
 
-**Se puede recortar, si se justifica en el informe:** la CNN híbrida con features BLS, las
-features de consistencia entre tránsitos, la validación anidada completa y la CV 5×5 de todas
-las variantes de la CNN.
+**Se puede recortar, si se justifica en el informe:** M2, la CNN híbrida con features BLS, la
+validación anidada completa y la CV 5×5 de todas las variantes de la CNN.
