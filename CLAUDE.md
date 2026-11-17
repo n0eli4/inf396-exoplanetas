@@ -9,9 +9,14 @@
   de esa verificación.
 - La verificación es literal: el mensaje tampoco puede nombrar este archivo (`CLAUDE.md`).
   Usar "archivo de instrucciones del proyecto".
-- Los commits van a nombre de Noelia (configuración de git de este repo). En un PC nuevo,
-  comprobar `git config user.name` / `user.email` dentro del repo: deben ser
-  `n0eli4` / `noelia.morales@usm.cl`; si no, configurarlos con `git config` (local, sin `--global`).
+- Los commits van a nombre de **quien está trabajando**, Noelia o Matías:
+  - Noelia: `n0eli4` / `noelia.morales@usm.cl` (configuración global de git en el laptop).
+  - Matías: `Matías Lara` / `matias.laraplaza2004@gmail.com`. Desde el 2026-11-17 está configurado
+    **localmente en el clon del laptop** (`git config` sin `--global`), por pedido de Matías.
+  - Antes de commitear, comprobar con `git config user.name` / `user.email` dentro del repo que
+    corresponda a quien trabaja. Si no, preguntar y configurarlo localmente (sin `--global`).
+  - Los commits ya subidos no se reescriben para cambiar su autor.
+  - Después de cada commit, informar también el autor (`git log -1 --format="%an <%ae>"`).
 - Mensajes de commit en español, estilo "Paso N: ..." para avances del pipeline.
 - Antes de hacer push, `git pull`: se trabaja desde dos PCs.
 
