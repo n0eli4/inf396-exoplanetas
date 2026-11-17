@@ -3,7 +3,7 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score, f1_score, precision_score, recall_score
+from sklearn.metrics import average_precision_score, f1_score, precision_recall_curve, precision_score, recall_score
 from sklearn.model_selection import RepeatedStratifiedKFold
 
 METRICS = ("recall", "precision", "f1", "pr_auc")
@@ -84,6 +84,20 @@ def bootstrap_ci(
         values[b] = compute_metrics(y_true[idx], y_score[idx], threshold)[metric]
     low, high = np.quantile(values, [alpha / 2, 1 - alpha / 2])
     return observed, low, high
+
+
+def choose_threshold(y: np.ndarray, oof: np.ndarray) -> float:
+    """Umbral que maximiza F1 sobre las predicciones fuera de fold de la CV.
+
+    oof: array (n_repeats, n_estrellas) devuelto por repeated_cv; se juntan todas las repeticiones.
+    El umbral se elige solo con el conjunto de entrenamiento y luego se aplica tal cual al test,
+    para no ajustar nada mirando los 5 positivos del test.
+    """
+    oof = np.atleast_2d(oof)
+    y_all = np.tile(y, oof.shape[0])
+    precision, recall, thresholds = precision_recall_curve(y_all, oof.ravel())
+    f1 = 2 * precision * recall / np.maximum(precision + recall, 1e-12)
+    return float(thresholds[np.argmax(f1[:-1])])   # el último punto de la curva no tiene umbral
 
 
 def summarize_cv(folds: pd.DataFrame) -> pd.DataFrame:
