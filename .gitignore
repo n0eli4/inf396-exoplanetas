@@ -25,6 +25,3 @@ results/*.npy
 .DS_Store
 Thumbs.db
 .vscode/
-
-# Instrucciones locales de Claude (no se suben)
-CLAUDE.md
