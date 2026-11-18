@@ -76,6 +76,10 @@ pip install -r requirements.txt
 | Casa | 12 hilos | ~7 min (411 s, medido) | ~6 min |
 | Laptop de Matías | Ryzen 5 4500U, 6 núcleos, 7 GB RAM | ~55 min (extrapolado: 4,7 s por época con 570 curvas; un entrenamiento completo, ~14 min) | ~10 min (medido: 536 s + 57 s) |
 
+Otros tiempos medidos en el laptop: vistas plegadas, ~11 min (618 s + 79 s); notebook 10 completo
+(5 CV 5×5, tres de ellas con la red feedforward), ~25 min; notebook 08 con la CNN ya entrenada,
+~3 min (si tiene que entrenarla, ~8 min más); modelos clásicos y del ramo, segundos a 1 min por CV.
+
 Probar el código en el laptop con pocas épocas y dejar las corridas largas de la CNN para el PC
 de la casa.
 
@@ -101,14 +105,19 @@ de la casa.
 |---|---|
 | `src/preprocessing.py` | `preprocess(X, window=101, n_sigma=4.0)`: mediana móvil, recorte de picos hacia arriba y normalización robusta. `window=None` o `n_sigma=None` omiten el paso correspondiente |
 | `src/features.py` | 8 estadísticos, 4 de FFT y 6 de BLS. Supuestos: cadencia de 30 min, períodos de 0,5–30 d, duraciones de 0,05–0,3 d |
-| `src/evaluation.py` | `compute_metrics`, `repeated_cv` (devuelve folds y oof), `bootstrap_ci`, `report_test`, `choose_threshold`, `paired_diff` |
-| `src/models_classic.py` | `make_random_forest(balanced=)`, `make_xgboost(balanced=)` |
+| `src/evaluation.py` | `compute_metrics`, `repeated_cv` (devuelve folds y oof), `bootstrap_ci`, `report_test`, `choose_threshold`, `paired_diff`, `paired_tests` (t-test corregido de Nadeau y Bengio + Wilcoxon) y `holm` |
+| `src/models_classic.py` | `make_random_forest(balanced=)`, `make_xgboost(balanced=)` y los modelos del ramo `MODELOS_RAMO` (`make_logistic`, `make_lda`, `make_knn`, `make_svm`, con `escalado="estandar"` o `"cuantiles"`) y `DecisionScore` (adapta `decision_function` a `predict_proba`) |
+| `src/folding.py` | `bls_best` (período, duración, t0), `fold_views` (vista global de 201 valores + local de 61, media por intervalo), `all_fold_views` (en paralelo) |
+| `src/models_mlp.py` | `FeedforwardClassifier`: MLP con estandarización dentro de `fit`, pérdida ponderada y opción `flip_views` |
+| `scripts/compute_folded.py` | Vistas plegadas de train y test → `results/folded_{train,test}.npz` (`views`, `bls`, `label`) |
 | `src/models_cnn.py` | `CNN1D` (3 bloques conv, global max pool) y `CNNClassifier` (`augment`, `noise_std`, `class_weight` ∈ {balanced, sqrt, none}, `cosine_lr`) |
 | `scripts/compute_features.py` | `--variante base\|sin_detrend\|sin_recorte\|ventana_301\|cadencia_15\|cadencia_60\|periodos_15\|todas`. Escribe `results/features_<variante>_{train,test}.csv` |
 | `scripts/run_ablation.py` | `--grupo clasicos\|cnn\|todos`, `--solo <nombres>`. Guarda `results/07_ablacion/<nombre>.csv` y `<nombre>_oof.npy`; se salta lo que ya existe |
 | `src/interpretability.py` | `saliency`, `grad_cam` (ReLU del último bloque conv), `smooth`, `bls_transit_mask` (puntos dentro de los tránsitos del mejor BLS) y `attention_on_transits` (concentración del Grad-CAM en esos tránsitos; ×1 = sin preferencia) |
 | `notebooks/08_interpretabilidad.ipynb` | Grad-CAM contra tránsitos BLS en el test, importancia por permutación del RF, análisis de errores con las predicciones fuera de fold y prueba de sesgo por campaña. `CNN_NOMBRE`/`CNN_PARAMS` al inicio: cambiarlos a la mejor CNN de la ablación. La CNN entrenada se guarda en `results/08_<nombre>.pt` (ignorado por git) |
 | `notebooks/07_ablacion.ipynb` | Lee `results/07_ablacion/` y genera `results/07_ablacion_resumen.csv` y `results/07_ablacion.png` |
+| `notebooks/09_modelos_ramo.ipynb` | M3 y M4: CV 5×5 de los modelos del ramo (→ `results/09_modelos/`), selección con lasso y contrastes con Holm sobre la ablación. Agrega sola las comparaciones de la CNN cuando estén sus resultados en `results/07_ablacion/` |
+| `notebooks/10_vista_plegada.ipynb` | M1: figura de las vistas y CV 5×5 de RF y red feedforward sobre vistas y 18 features + vistas (→ `results/10_plegado/`, `results/10_comparacion.csv`) |
 
 # Estado (actualizado 2026-11-17)
 
@@ -140,8 +149,11 @@ README.
   (`FeedforwardClassifier`: MLP 262→64→32→1 con pérdida ponderada y opción `flip_views`) y
   notebook `10_vista_plegada` con conclusiones.
 - `.venv` instalado en el laptop (torch 2.15 CPU, xgboost 3.2, scikit-learn 1.9.1).
-- El notebook 07 se genera con un script auxiliar fuera del repo. Para editarlo, modificar
-  directamente el `.ipynb`.
+- Los notebooks 07 a 10 se generaron con scripts auxiliares que no están en el repo. Para
+  editarlos, modificar directamente el `.ipynb` (por ejemplo, con `nbformat`) y volver a ejecutarlos
+  con `nbconvert`. Los `CV` ya calculados se leen de `results/` y no se recalculan.
+- Al ejecutar notebooks con `nbconvert` en Windows aparecen `KeyError: ...joblib_memmapping_folder...`:
+  es ruido de joblib al limpiar archivos temporales y no afecta los resultados.
 
 **En curso:**
 - PC de la casa: `run_ablation.py --grupo cnn` (8 configuraciones, ~1 h). Después, commit y push
@@ -263,27 +275,30 @@ y justificarse con ellas en el informe.
 **Orden acordado: primero M3 y M4 (rápidas y seguras), después M1. M2 solo si sobra tiempo. M5
 cuando estén los resultados de la CNN.**
 
-- **M1. Vista plegada + red feedforward (unidad 8) — la de mayor potencial.** Plegar la curva
+- **M1. Vista plegada + red feedforward (unidad 8). HECHA: resultado negativo** (ver Hallazgos y
+  notebook 10).
+  Plan original: Plegar la curva
   preprocesada en el período del BLS (fase de −0,5 a 0,5, centrada en el tránsito) y promediarla en
   ~200 bins: todas las repeticiones del tránsito quedan apiladas. Usarla como entrada de un MLP
   (o una CNN chica) con el mismo protocolo de CV 5×5. Es la idea de "vista global/local" de
   Shallue y Vanderburg (2018), ya citado. Ataca las dos debilidades encontradas: la CNN no ve la
   repetición, y la repetición es justo lo que la vista plegada hace explícito. Tiempo: ~2–3 h más
   ~10 min de BLS.
-- **M2. Features para descartar binarias eclipsantes (extracción de características).** Comparar
+- **M2. Features para descartar binarias eclipsantes (extracción de características). PENDIENTE,
+  opcional.** Comparar
   la profundidad de los tránsitos pares contra los impares (en una binaria difieren), buscar un
   eclipse secundario a fase 0,5, medir la variación de profundidad entre tránsitos individuales y
   sacar el segundo y tercer mejor período del BLS. Ataca los falsos positivos (por ejemplo, el
   test 372) y los casos con un período espurio. Tiempo: ~2 h más ~10 min de BLS.
-- **M3. Modelos del ramo sobre las 18 features (clasificación).** Regresión logística con L1
+- **M3. Modelos del ramo sobre las 18 features (clasificación). HECHA** (notebook 09). Regresión logística con L1
   (lasso, que además selecciona features) y L2, LDA, KNN y SVM, con escalado dentro del pipeline
   para que no haya fuga entre folds. Mismo protocolo (CV 5×5, seed 0). Sirve como "comparación con
   otros métodos". Tiempo: ~30 min.
-- **M4. Contraste de hipótesis para comparar modelos (inferencia).** Sobre las diferencias
+- **M4. Contraste de hipótesis para comparar modelos (inferencia). HECHA** (notebook 09). Sobre las diferencias
   pareadas por fold: prueba de Wilcoxon de rangos con signo y t-test corregido para CV repetida
   (Nadeau y Bengio, 2003), que corrige la dependencia entre folds que comparten datos de
   entrenamiento. Reemplaza el "está dentro del ruido" dicho a ojo por un p-valor. Tiempo: ~30 min.
-- **M5. Ensamble CNN + RF.** Promediar los rankings: cometen errores distintos (la CNN tiene más
+- **M5. Ensamble CNN + RF. PENDIENTE** (necesita los OOF de la CNN). Promediar los rankings: cometen errores distintos (la CNN tiene más
   recall; el RF, más precisión). Tiempo: ~20 min con los OOF de la CNN.
 - **Trabajo futuro (solo mencionar en el informe):** procesos gaussianos para modelar la
   variabilidad estelar antes de buscar tránsitos (se usan en astronomía, unidad 5).
